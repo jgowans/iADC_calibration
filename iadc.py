@@ -551,6 +551,8 @@ def gc_0():
 
 
 fisda_v=0   # default value
+drda_q = 0
+drda_i = 0
 '''
 adjust the fine sampling data adjustment (FISDA) on channel Q
 ADDR = 111 = 0x07

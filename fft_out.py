@@ -33,8 +33,8 @@ def fft_out(channel):
   '''
   
   # FFT and plot
-  # adc freq=1 GHz = 1000 MHz
-  Fs = 1000000000 # sampling frequency: 2 GHz
+  # adc freq=0.8 GHz = 800 MHz
+  Fs = 800000000 # sampling frequency: 1.6 GHz
   T = 1.0/Fs  # sample time
   L = 4*(2**16)  # length of sample points
   nfft = L

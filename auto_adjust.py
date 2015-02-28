@@ -5,7 +5,7 @@
   Date: July 23, 2010
 '''
 
-Fs=2e9
+Fs=1.6e9
 
 execfile('maker.py')
 execfile('tester.py')  

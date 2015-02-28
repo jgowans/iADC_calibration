@@ -44,8 +44,8 @@ def tester():
   show()
   '''
   # FFT and plot
-  # adc freq=1 GHz = 1000 MHz
-  Fs = 1600000000 # sampling frequency: 2 GHz
+  # adc freq=1.6 GHz = 800 MHz
+  Fs = 1600000000 # sampling frequency: 1.6 GHz
   T = 1.0/Fs  # sample time
   L = 8*(2**16)  # length of sample points
   nfft = L
