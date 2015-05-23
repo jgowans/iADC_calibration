@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 % Author: Hong Chen
 % Date: August 5,2010

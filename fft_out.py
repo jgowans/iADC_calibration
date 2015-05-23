@@ -12,9 +12,7 @@ from pylab import *
 
 def fft_out(channel):
 
-  x = roach.snapshot_arm("snap64", man_trig=True, man_valid=True, offset=-1, circular_capture=False)
-  adc0_data = roach.snapshot_get("snap64", wait_period=-1, arm=False)["data"]
-  y = struct.unpack(str(len(adc0_data) ) + "b", (adc0_data))
+  y = get_snap()
 
 
 

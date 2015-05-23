@@ -624,3 +624,17 @@ def fisda_dec_loop(n):
     for i in range(0,n):
         fisda_dec()
     return read_iadc()
+
+'''
+Sets ISA to -100 ps which is recommended for DMUX 1:2 usage
+ADDR = 100 = 0x04
+D[0:2] : channel I (xxx 010 = 0x02)
+D[3:5] : channel Q (010 xxx = 0x10)
+D[6:15]: 1000 0100 00 = 0x8400
+'''
+def set_isa():
+    print("\nSetting ISA to -100 ps for I and Q\n")
+#    roach.blindwrite('iadc_controller','%c%c%c%c'%(0x84, 0x12, 0x04, 0x01),offset=0x4)
+    roach.blindwrite('iadc_controller','%c%c%c%c'%(0x84, 0x02, 0x04, 0x01),offset=0x4)
+    time.sleep(0.1)
+

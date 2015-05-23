@@ -7,6 +7,7 @@
 
 Fs=1.6e9
 
+execfile('get_snap.py')
 execfile('maker.py')
 execfile('tester.py')  
 execfile('fft_out.py')
@@ -18,6 +19,7 @@ no_calibration()   # set to no calibration mode, so that I'll be able to access 
 offset_0('iq')    # set offset to 0 for both channel I and channel Q
 gain_0()    # set analog gain to 0 dB (channel I & channel Q)
 gc_0() # set gain compensation to 0 dB
+set_isa() # set ISA to 0
 test=tester()  # get the 8*(2**16) sample points, main purpose here is to make sure that the program has been compiled successfully
                # if an error message pops out, please re-run this *auto_adjust.py* again.
 
@@ -129,7 +131,7 @@ TOL is just an approximate expectation to the final result, when it says 'unsecc
 as long as it's not too far away from TOL
 # function h_interleaving(f,Fs),  h_s(f,position) defined in analysis_function.py
 # function fft_out(2) defined in fft_out.py
-# function fisda_inc(),fisda_dec() defined in iadc.py
+# function set_isa(), fisda_inc(),fisda_dec() defined in iadc.py
 related material in datasheet:  AT84AD004B,p36      AT84AD001C,p34
 '''    
 def delay_adjust():
