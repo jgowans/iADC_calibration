@@ -4,121 +4,110 @@
  Date: July 23, 2010
 '''
 
-val=roach.read('iadc_controller',128)
+import corr
+import logging
 
-'''
-  read the original value of iadc_controller
-'''
-def read_iadc():
-    val=roach.read('iadc_controller',128)
-    return val
+class IADC:
+    def __init__(self, fpga, zdok_n, mode='indep', logger=logging.getLogger()):
+        """
+        fpga -- corr.katcp_wrapper.FpgaClient instance used to talk to ROACH
+        zdok_n -- either 0 or 1. Specifies which ADC card to control
+        mode -- How should the I and Q channels be sampled. 
+            either: 'indep', 'inter_Q' or'inter_I'. Default: 'indep'
+        logger -- instance of a Logger. Default: root logger.
+        """
+        logging.basicConfig()
+        self.logger = logger
+        self.zdok_n = zdok_n
+        self.fpga = fpga
+        corr.iadc.set_mode(self.fpga, mode='SPI')  # enable software control
+        mode_bits = mode_bits = 0x2 if mode=='inter_I' else 0 if mode=='inter_Q' else 0xB
+        self.config_reg = (1<<14)+(0b11<<12)+(mode_bits<<4)+(1<<3)+(1<<2)
+        self.offset_vi, self.offset_vq = 0
+        self.gain_vi, self.gain_vq = 0
+        self.write_control_reg()
+        logger.debug("Initialised iADC for software control")
 
+    def read_controller(self):
+        """
+        Reads the first 128 bytes at the controller address. Why 128? I don't know...
+        """
+        return self.fpga.read('iadc_controller', 128)
 
-'''
-   #first thing to do
-'''
-def start_test():
-    print '\n'
-    print 'Starting the test...'
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(0x0,0x0,0x03,0x0))
-    time.sleep(0.001)
-    print 'You can write to the registers now.'
-    return read_iadc()
+    def write_control_reg(self):
+        corr.iadc.spi_write_register(self.zdok_n, 0x00, self.control_reg)
+        logging.debug("Control register set to: {cr:#06x}".format(cr = self.control_reg))
 
+    def reset_dcm(self):
+        corr.iadc.rst(self.fpga, self.zdok_n)
+        self.logger.info("iADC DCM reset for ZDOKL {n}".format(n = self.zdok_n))
 
+    def new_cal(self):
+        """
+        Starts a new calibration
+        """
+        # set bits 10 and 11
+        self.control_reg |= (0b11 << 10)
+        self.write_control_reg()
+        self.logger.info("On ADC:{z}, started a new calibration phase".format(z = self.zdok_n))
 
+    def no_cal(self):
+        """
+        Disable calibration to allow us to set the registers ourselves
+        """
+        # clear bits 10 and 11
+        self.control_reg &= ~(0b11 << 10)
+        self.write_control_reg()
+        self.logger.info("On ADC: {z}, disabled calibration compensation".format(z = self.zdok_n))
 
-'''
-   # reset the DCM
-'''
-def reset_dcm():
-    #print 'resetting the dcm...'
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(0x0,0x0,0x03,0x03))
-    time.sleep(0.001)
-    #print 'resetting dcm completed'
-    return read_iadc()
+    def keep_last_cal(self):
+        """
+        I don't know if this either:
+            - does not change cal state. If it was in no cal, it stays in no cal
+            - forces the last calculated calibration values into the registers.
+        For safety suggest rather use #no_cal() if that's what you want
+        """
+        # set bit 10 and clear bit 11
+        self.control_reg |= (0b1 << 10)
+        self.control_reg &= ~(0b1 << 11)
+        self.write_control_reg()
+        self.logger.info("Set ADC: {z} to keep its last calibration value".format(z = self.zdok_n))
 
+    def select_analogue(self, analogue):
+        """
+        Selects how the ADC samples the analogue inputs.
+        If interleaved (IQ), the channels will be samples in phase.
+        
+        analogue -- either 'I', 'Q', or 'IQ'
+        """
+        assert(analogue in ('I', 'Q', 'IQ'))
+        # clear the bits we need to define. Bits 7 downto 4
+        self.control_reg &= ~(0b1111 << 4)
+        # determine the bits configuration for the mode
+        mode_bits = 0b0010 if mode=='I' else 0b0000 if mode=='Q' else 0x1011 # if IQ
+        # define and write the bits
+        self.control_reg |= (mode_bits << 4)
+        self.write_control_reg()
+        logging.info("On ADC: {z}, set analogue mode to: {m}".format(z = self.zdok_n, m = analogue))
 
+    def offset_inc(self, channel):
+        """
+        Increases the offset for the channel by 0.25 lsb 
 
-'''
-start a new calibration phase
-Old DATA =0110 0100 0110 1100
-DATA =X X X X 1 1 0 X X X X X X X X X = 0110 1100 0110 1100 = 0x6c, 0x6c   
-ADDR =000
-'''
-def new_cal():
-   print '\n'
-   print 'starting a new calibration phase...'
-   roach.blindwrite('iadc_controller','%c%c%c%c'%(0x6c,0x6c,0x0,0x1),offset=0x4)   
-   time.sleep(0.001) # probably unnecessary wait for delay to take
-   reset_dcm()
-   print 'new calibration phase completed.'
-   return read_iadc()
-
-
-'''
-set to no calibration mode
-so that gain compensation and offset compensation can be done
-'''
-def no_calibration():
-   print '\n'
-   print 'setting to no calibration mode...'
-   roach.blindwrite('iadc_controller','%c%c%c%c'%(0x60,0x6c,0x0,0x01),offset=0x4)
-   time.sleep(0.001) # probably unnecessary wait for delay to take
-   reset_dcm()
-   print 'no calibration mode setting completed.'
-   return read_iadc()
-
-
-
-'''
-   #intput_i
-   analog input channel selection: analog I-i/q
-   xxxx|xx0x|xx10|xxxx    =0x00,0x20 (adc0_data)
- #or = 0110 0100 0110 1100 =  0x64, 0x6c
-     
-'''
-def input_i():   
-   print '\n'
-   print 'selecting input channel I...'
-   roach.blindwrite('iadc_controller','%c%c%c%c'%(0x64,0x6c,0x0,0x1),offset=0x4)   
-   time.sleep(0.001) # probably unnecessary wait for delay to take
-   reset_dcm()
-   print 'Input channel: I-> ADC I&Q'
-   return read_iadc()
-
-
-'''
-   #intput_q
-   analog input channel selection: analog Q-i/q
-   xxxx|xx0x|xx0x|xxxx    =0x00,0x20 (adc0_data)
- #or = 0110 0100 0100 1100 =  0x64, 0x4c  
-'''
-def input_q():
-   print '\n'
-   print 'selecting input channel Q...'
-   roach.blindwrite('iadc_controller','%c%c%c%c'%(0x64,0x4c,0x0,0x1),offset=0x4)   
-   time.sleep(0.001) # probably unnecessary wait for delay to take
-   reset_dcm()
-   print 'Input channel:Q-> ADC I&Q'
-   return read_iadc()
-
-
-
-'''
-   # input_iq
-   analog input channel selection: analog I-i, Q-q
-   xxxx|xx0x|xx11|xxxx 
-   0110 0100 0111 1100 = 0x64,0x7c
-'''
-def input_iq():
-   print '\n'
-   print 'selecting input channel: I & Q ...'
-   roach.blindwrite('iadc_controller','%c%c%c%c'%(0x64,0x7c,0x0,0x1),offset=0x4)  
-   time.sleep(0.001) # probably unnecessary wait for delay to take
-   reset_dcm()
-   print 'Input channel: I-> ADC I;   Q-> ADC Q'
-   return read_iadc()   
+        channel -- 'I' or 'Q'
+        """
+        assert(channel in ('I', 'Q'))
+        if ( (channel == 'I' and self.offset_vi >= 31.75) or 
+                (channel == 'Q' and self.offset_vq >= 31.75) ):
+            self.logger.warn("Offset for channel {c} already at maximum.".format(c = channel))
+            return False
+        if channel == 'I':
+            self.offset_vi += 0.25
+        elif channel == 'Q':
+            self.offset_vq += 0.25
+         corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+         self.logger.info("Set offset to I to {i} and Q to {q}".format(i = self.offset_vi, q = self.offset_vq))
+        return True
 
 
 # default offset value = 00000000b = 0x00 = 0LSB
