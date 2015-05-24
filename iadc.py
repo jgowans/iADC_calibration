@@ -22,9 +22,11 @@ class IADC:
         self.fpga = fpga
         corr.iadc.set_mode(self.fpga, mode='SPI')  # enable software control
         mode_bits = mode_bits = 0x2 if mode=='inter_I' else 0 if mode=='inter_Q' else 0xB
-        self.config_reg = (1<<14)+(0b11<<12)+(mode_bits<<4)+(1<<3)+(1<<2)
-        self.offset_vi, self.offset_vq = 0
-        self.gain_vi, self.gain_vq = 0
+        self.control_reg = (1<<14)+(0b11<<12)+(mode_bits<<4)+(1<<3)+(1<<2)
+        self.offset_vi = 0
+        self.offset_vq = 0
+        self.gain_vi = 0
+        self.gain_vq = 0
         self.write_control_reg()
         logger.debug("Initialised iADC for software control")
 
@@ -35,7 +37,7 @@ class IADC:
         return self.fpga.read('iadc_controller', 128)
 
     def write_control_reg(self):
-        corr.iadc.spi_write_register(self.zdok_n, 0x00, self.control_reg)
+        corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.control_reg)
         logging.debug("Control register set to: {cr:#06x}".format(cr = self.control_reg))
 
     def reset_dcm(self):
@@ -95,6 +97,7 @@ class IADC:
         Increases the offset for the channel by 0.25 lsb 
 
         channel -- 'I' or 'Q'
+        Returns True if offset could be increased or False it it's already at maximum
         """
         assert(channel in ('I', 'Q'))
         if ( (channel == 'I' and self.offset_vi >= 31.75) or 
@@ -105,139 +108,49 @@ class IADC:
             self.offset_vi += 0.25
         elif channel == 'Q':
             self.offset_vq += 0.25
-         corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
-         self.logger.info("Set offset to I to {i} and Q to {q}".format(i = self.offset_vi, q = self.offset_vq))
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+        # this reall should be moved into the corr.iadc file...
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
         return True
 
+    def offset_dec(self, channel):
+        """
+        Decreases the offset for the channel by 0.25 lsb
 
-# default offset value = 00000000b = 0x00 = 0LSB
-# i channel and q channel
-offset_vi=0x00
-offset_vq=0x00
+        channel -- 'I' or 'Q'
+        Returns True if offset could be decreased of False if it's already at minimum.
+        """
+        assert(channel in ('I', 'Q'))
+        if ( (channel == 'I' and self.offset_vi <= -31.75) or
+                (channel == 'Q' and self.offset_vq <= 31.75) ):
+            self.logger.warn("Offset for channel {c} already at minimum".format(c = channel))
+            return False
+        if channel == 'I':
+            self.offset_vi -= 0.25
+        elif channel == 'Q':
+            self.offset_qi -= 0.25
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+        return True
 
+    def offset_0(self, channel):
+        """
+        Sets the offset for the channel to 0
 
-'''
-   # offset compensation 
-   #step 1 * 0.25LSB
-   address 010 = 0x02
-   DATA7 to DATA0: channel I
-   DATA15 to DATA8: channel Q
-   code 11111111b=0xff = 31.75LSB
-   code 10000000b=00000000b= 0x80=0x00= 0LSB
-   code 01111111b=0x7f= -31.75LSB
-   # code 10000001b=0x81 = 1LSB
-'''
-def offset_inc(channel):
-    global offset_vi
-    global offset_vq
-    v=offset_vi
-    v2=offset_vq
-    if v>=128:
-       v=v+1
-    elif v==0:
-       v=129
-    else:
-       v=v-1
-    if v2>=128:
-       v2=v2+1
-    elif v2==0:
-       v2=129
-    else:
-       v2=v2-1
-    if channel=='i':
-       offset_vi=v
-    elif channel=='q':
-       offset_vq=v2
-    elif channel=='iq' or channel=='qi':
-       offset_vi=v
-       offset_vq=v2
-    else:
-       print 'invalid argument!'  
-       return
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(offset_vq,offset_vi,0x02,0x01),offset=0x4)
-    time.sleep(0.001) # probably unnecessary wait for delay to take
-    return read_iadc()
+        channel -- 'I' or 'Q'
+        """
+        assert(channel in ('I', 'Q'))
+        if channel == 'I':
+            self.offset_vi = 0
+        if channel == 'Q':
+            self.offset_vq = 0
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
 
 
-'''
-   # offset compensation 
-   #step -1 * 0.25LSB
-   address 010 = 0x02
-   DATA7 to DATA0: channel I
-   DATA15 to DATA8: channel Q
-   code 11111111b=0xff = 31.75LSB
-   code 10000000b=00000000b= 0x80=0x00= 0LSB
-   code 01111111b=0x7f= -31.75LSB
-   # code 00000001b=0x01 = -1LSB
-'''
-def offset_dec(channel):
-    global offset_vi
-    global offset_vq
-    v=offset_vi
-    v2=offset_vq
-    if v==128:
-       v=1
-    elif v==0:
-       v=1
-    elif v<128:
-       v=v+1
-    else:
-       v=v-1
-    if v2==128:
-       v2=1
-    elif v2==0:
-       v2=1
-    elif v2<128:
-       v2=v2+1
-    else:
-       v2=v2-1
-    if channel=='i':
-       offset_vi=v
-    elif channel=='q':
-       offset_vq=v2
-    elif channel=='iq' or channel=='qi':
-       offset_vi=v
-       offset_vq=v2
-    else:
-       print 'invalid argument!'  
-       return
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(offset_vq,offset_vi,0x02,0x01),offset=0x4)
-    time.sleep(0.001) # probably unnecessary wait for delay to take
-    reset_dcm()
-    return read_iadc()
+# Note, the ADC must be set to No calibation beofre ghain and offsdrt adjustment can be made
 
-
-
-'''
-   # offset compensation 
-   #step -1 * 0.25LSB
-   address 010 = 0x02
-   DATA7 to DATA0: channel I
-   DATA15 to DATA8: channel Q
-   code 11111111b=0xff = 31.75LSB
-   code 10000000b=00000000b= 0x80=0x00= 0LSB
-   code 01111111b=0x7f= -31.75LSB
-   # code 00000000b=0x00 = 0LSB
-'''
-def offset_0(channel):
-    print '\n'
-    print 'setting the offset to 0 for channel: '+channel
-    global offset_vi
-    global offset_vq
-    if channel=='i':
-       offset_vi=0
-    elif channel=='q':
-       offset_vq=0
-    elif channel=='iq' or channel=='qi':
-       offset_vi=0
-       offset_vq=0
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(offset_vi,offset_vq,0x02,0x01),offset=0x4)
-    time.sleep(0.001) # probably unnecessary wait for delay to take
-    reset_dcm()
-    print 'setting completed. channel '+channel+': offset 0'
-    return read_iadc()
-
-
+# I don't see the point of these functions.... 
 '''
  # offset compensation inc loop
 '''
@@ -254,13 +167,6 @@ def offset_dec_loop(channel,n):
     for i in range(0,n):
         offset_dec(channel)
     return read_iadc()
-
-
-
-
-
-
-
 
 
 '''
