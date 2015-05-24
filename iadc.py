@@ -6,8 +6,10 @@
 
 import corr
 import logging
+import json
+import iadc_registers
 
-class IADC:
+class IAdc:
     def __init__(self, fpga, zdok_n, mode='indep', logger=logging.getLogger()):
         """
         fpga -- corr.katcp_wrapper.FpgaClient instance used to talk to ROACH
@@ -21,12 +23,7 @@ class IADC:
         self.zdok_n = zdok_n
         self.fpga = fpga
         corr.iadc.set_mode(self.fpga, mode='SPI')  # enable software control
-        mode_bits = mode_bits = 0x2 if mode=='inter_I' else 0 if mode=='inter_Q' else 0xB
-        self.control_reg = (1<<14)+(0b11<<12)+(mode_bits<<4)+(1<<3)+(1<<2)
-        self.offset_vi = 0
-        self.offset_vq = 0
-        self.gain_vi = 0
-        self.gain_vq = 0
+        self.registers = iadc_registers.IAdcRegisters()
         self.write_control_reg()
         logger.debug("Initialised iADC for software control")
 
@@ -37,60 +34,53 @@ class IADC:
         return self.fpga.read('iadc_controller', 128)
 
     def write_control_reg(self):
-        corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.control_reg)
-        logging.debug("Control register set to: {cr:#06x}".format(cr = self.control_reg))
+        corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.registers.control.value)
+        logging.debug("Control register set to: {cr:#06x}".format(cr = self.registers.control.value))
 
     def reset_dcm(self):
         corr.iadc.rst(self.fpga, self.zdok_n)
         self.logger.info("iADC DCM reset for ZDOKL {n}".format(n = self.zdok_n))
 
-    def new_cal(self):
+    def set_cal_mode(self, mode):
         """
-        Starts a new calibration
-        """
-        # set bits 10 and 11
-        self.control_reg |= (0b11 << 10)
-        self.write_control_reg()
-        self.logger.info("On ADC:{z}, started a new calibration phase".format(z = self.zdok_n))
+        Defines the calibration mode of the iADC
 
-    def no_cal(self):
+        cal_type --
+            new_cal: starts a new calibration and applies values
+            keep_last_cal: applies the result of the last cal.
+            no_cal: removes cal values and allows register modifications
         """
-        Disable calibration to allow us to set the registers ourselves
-        """
-        # clear bits 10 and 11
-        self.control_reg &= ~(0b11 << 10)
+        # just pass it on. Validation is done there.
+        self.registers.control.set_cal_mode(mode)
         self.write_control_reg()
-        self.logger.info("On ADC: {z}, disabled calibration compensation".format(z = self.zdok_n))
+        self.logger.info("For ADC {z}, calibration set to: '{c}'".format(z = self.zdok_n, c = mode))
 
-    def keep_last_cal(self):
+    def set_analogue_selection(self, mode):
         """
-        I don't know if this either:
-            - does not change cal state. If it was in no cal, it stays in no cal
-            - forces the last calculated calibration values into the registers.
-        For safety suggest rather use #no_cal() if that's what you want
-        """
-        # set bit 10 and clear bit 11
-        self.control_reg |= (0b1 << 10)
-        self.control_reg &= ~(0b1 << 11)
-        self.write_control_reg()
-        self.logger.info("Set ADC: {z} to keep its last calibration value".format(z = self.zdok_n))
+        Specifies how the RF channels will be connected to the ADC cores.
+        Either independant or one channel interleaved
 
-    def select_analogue(self, analogue):
+        mode --
+            indep:      InI -> ADCI ; InQ -> ADCQ
+            inter_I:    InI -> ADCI ; InI -> ADCQ
+            inter_Q:    InQ -> ADCI ; InQ -> ADCQ
         """
-        Selects how the ADC samples the analogue inputs.
-        If interleaved (IQ), the channels will be samples in phase.
-        
-        analogue -- either 'I', 'Q', or 'IQ'
-        """
-        assert(analogue in ('I', 'Q', 'IQ'))
-        # clear the bits we need to define. Bits 7 downto 4
-        self.control_reg &= ~(0b1111 << 4)
-        # determine the bits configuration for the mode
-        mode_bits = 0b0010 if mode=='I' else 0b0000 if mode=='Q' else 0x1011 # if IQ
-        # define and write the bits
-        self.control_reg |= (mode_bits << 4)
+        self.registers.control.set_analogue_selection(mode)
         self.write_control_reg()
-        logging.info("On ADC: {z}, set analogue mode to: {m}".format(z = self.zdok_n, m = analogue))
+        self.logger.info("On ADC: {z}, set analogue mode to: {m}".format(z = self.zdok_n, m = mode))
+
+    def set_clock_selection(self, mode):
+        """
+        Specifies the phase between each core's clock
+
+        mode --
+            in:     in phase.
+            quad:   quadtrature
+            neg:    180 degree phase shift (negative)
+        """
+        self.registers.control.set_clock_selection(mode)
+        self.write_control_reg()
+        self.logger.info("On ADC: {z} set clock selection to: {m}".format(z = self.zdok_n, m = mode))
 
     def offset_inc(self, channel):
         """
@@ -100,17 +90,18 @@ class IADC:
         Returns True if offset could be increased or False it it's already at maximum
         """
         assert(channel in ('I', 'Q'))
-        if ( (channel == 'I' and self.offset_vi >= 31.75) or 
-                (channel == 'Q' and self.offset_vq >= 31.75) ):
+        if ( (channel == 'I' and self.registers.offset_vi >= 31.75) or 
+                (channel == 'Q' and self.registers.offset_vq >= 31.75) ):
             self.logger.warn("Offset for channel {c} already at maximum.".format(c = channel))
             return False
         if channel == 'I':
-            self.offset_vi += 0.25
+            self.registers.offset_vi += 0.25
         elif channel == 'Q':
-            self.offset_vq += 0.25
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+            self.registers.offset_vq += 0.25
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
         # this reall should be moved into the corr.iadc file...
-        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
+            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
         return True
 
     def offset_dec(self, channel):
