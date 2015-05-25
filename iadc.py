@@ -121,94 +121,32 @@ class IAdc:
         elif channel == 'Q':
             self.offset_qi -= 0.25
         corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
-        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
+            z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
         return True
 
-    def offset_0(self, channel):
+    def offset_set(self, channel, value):
         """
-        Sets the offset for the channel to 0
+        Sets the offset for the channel to a specific value.
+        This is as opposed to the other methods which do a relative inc or dec.
 
         channel -- 'I' or 'Q'
+        value -- Value in LSB from -31.75 to 31.75
         """
         assert(channel in ('I', 'Q'))
+        assert( (value <= 31.75) and (value >= -31.75) )
         if channel == 'I':
-            self.offset_vi = 0
+            self.offset_vi = value
         if channel == 'Q':
-            self.offset_vq = 0
+            self.offset_vq = value
         corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
-        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
+            z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
 
 
 # Note, the ADC must be set to No calibation beofre ghain and offsdrt adjustment can be made
 
 # I don't see the point of these functions.... 
-'''
- # offset compensation inc loop
-'''
-def offset_inc_loop(channel,n):
-    for i in range(0,n):
-        offset_inc(channel)
-    return read_iadc()
-
-
-'''
- # offset compensation dec loop
-'''
-def offset_dec_loop(channel,n):
-    for i in range(0,n):
-        offset_dec(channel)
-    return read_iadc()
-
-
-'''
-   # offset compensation 
-   #step -1 * 0.25LSB
-   address 010 = 0x02
-   DATA7 to DATA0: channel I
-   DATA15 to DATA8: channel Q
-   code 11111111b=0xff = 31.75LSB
-   code 10000000b=00000000b= 0x80=0x00= 0LSB
-   code 01111111b=0x7f= -31.75LSB
-   # code 11111111b=0xff = 31.75LSB
-'''
-def offset_max():
-    global offset_vi,offset_vq
-    print '\n'
-    print 'setting offset to maximum value...'
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(0xff,0xff,0x02,0x01),offset=0x4)
-    time.sleep(0.001) # probably unnecessary wait for delay to take
-    reset_dcm()
-    offset_vi=0xff
-    offset_vq=0xff 
-    print 'setting completed. Offset: 31.75LSB(maximum)'
-    return read_iadc()
-
-'''
-   # offset compensation 
-   #step -1 * 0.25LSB
-   address 010 = 0x02
-   DATA7 to DATA0: channel I
-   DATA15 to DATA8: channel Q
-   code 11111111b=0xff = 31.75LSB
-   code 10000000b=00000000b= 0x80=0x00= 0LSB
-   code 01111111b=0x7f= -31.75LSB
-   # code 01111111b=0xff = -31.75LSB
-'''
-def offset_min():
-    print '\n'
-    print 'setting the offset to minimum value...'
-    global offset_vi,offset_vq
-    roach.blindwrite('iadc_controller','%c%c%c%c'%(0x7f,0x7f,0x02,0x01),offset=0x4)
-    time.sleep(0.001) # probably unnecessary wait for delay to take
-    reset_dcm()
-    offset_vi=0x7f
-    offset_vq=0x7f
-    print 'setting completed.  Offset: -31.75LSB(minimum)'
-    return read_iadc()
-
-
-
-
 gain_vi=0x80
 gain_vq=0x80
 '''
