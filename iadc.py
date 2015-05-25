@@ -25,7 +25,7 @@ class IAdc:
         corr.iadc.set_mode(self.fpga, mode='SPI')  # enable software control
         self.registers = iadc_registers.IAdcRegisters()
         self.write_control_reg()
-        logger.debug("Initialised iADC for software control")
+        self.logger.debug("Initialised iADC for software control")
 
     def read_controller(self):
         """
@@ -40,6 +40,12 @@ class IAdc:
     def reset_dcm(self):
         corr.iadc.rst(self.fpga, self.zdok_n)
         self.logger.info("iADC DCM reset for ZDOKL {n}".format(n = self.zdok_n))
+
+    def write_all_registers(self):
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
+        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
+            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
+
 
     def set_cal_mode(self, mode):
         """
@@ -112,17 +118,17 @@ class IAdc:
         Returns True if offset could be decreased of False if it's already at minimum.
         """
         assert(channel in ('I', 'Q'))
-        if ( (channel == 'I' and self.offset_vi <= -31.75) or
-                (channel == 'Q' and self.offset_vq <= 31.75) ):
+        if ( (channel == 'I' and self.registers.offset_vi <= -31.75) or
+                (channel == 'Q' and self.registers.offset_vq <= -31.75) ):
             self.logger.warn("Offset for channel {c} already at minimum".format(c = channel))
             return False
         if channel == 'I':
-            self.offset_vi -= 0.25
+            self.registers.offset_vi -= 0.25
         elif channel == 'Q':
-            self.offset_qi -= 0.25
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+            self.registers.offset_vq -= 0.25
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
         return True
 
     def offset_set(self, channel, value):
@@ -136,12 +142,12 @@ class IAdc:
         assert(channel in ('I', 'Q'))
         assert( (value <= 31.75) and (value >= -31.75) )
         if channel == 'I':
-            self.offset_vi = value
+            self.registers.offset_vi = value
         if channel == 'Q':
-            self.offset_vq = value
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.offset_vi, self.offset_vq)
+            self.registers.offset_vq = value
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
+            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
 
     def analogue_gain_inc(self, channel):
         pass
