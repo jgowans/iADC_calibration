@@ -143,6 +143,24 @@ class IAdc:
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
             z = self.zdok_n, vi = self.offset_vi, vq = self.offset_vq))
 
+    def analogue_gain_inc(self, channel):
+        pass
+
+    def analogue_gain_dec(self, channel):
+        pass
+
+    def analogue_gain_set(self, channel, value):
+        pass
+
+    def gain_compensation_inc(self, channel):
+        pass
+
+    def gain_compensation_dec(self, channel):
+        pass
+
+    def gain_compensation_set(self, channel, value):
+        pass
+
 
 # Note, the ADC must be set to No calibation beofre ghain and offsdrt adjustment can be made
 
