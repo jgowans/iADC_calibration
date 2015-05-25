@@ -4,11 +4,12 @@ import json
 import logging
 import iadc_registers_control
 
-class IAdcRegisters:
+class IAdcRegisters(object):
     def __init__(self):
         """
         Initialises the defined registers to 0
         """
+        object.__setattr__(self, '_frozen', False)  # this is to define #__setattr__
         self.control = iadc_registers_control.IAdcRegistersControl()
         self.offset_vi = 0
         self.offset_vq = 0
@@ -16,6 +17,21 @@ class IAdcRegisters:
         self.analogue_gain_vq = 0
         self.gain_compensation_vi = 0
         self.gain_compensation_vq = 0
+        self._frozen = True
+
+    def __setattr__(self, name, value):
+        """
+        This exists to ensure new registers can't be accidentally added.
+        It should probably be swapped with a better interface to the registers.
+        Dictionary, perhaps?
+        """
+        if self._frozen == True:
+            if hasattr(self, name):
+                object.__setattr__(self, name, value)
+            else:
+                raise TypeError("Cannot add new attribute")
+        else:
+            object.__setattr__(self, name, value)
 
     def get_from_file(self, filename):
         """
