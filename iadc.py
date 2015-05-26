@@ -190,7 +190,7 @@ class IAdc:
         if channel == 'I':
             self.registers.analogue_gain_vi = value
         if channel == 'Q':
-            self.registers.analogue_gain_vi = value
+            self.registers.analogue_gain_vq = value
         corr.iadc.analogue_gain_adj(self.fpga, self.zdok_n, self.registers.analogue_gain_vi, self.registers.analogue_gain_vq) 
         self.logger.info("For ADC {z}, analogue gain for I: {vi}, anaogue gain for Q: {vq}".format(
             z = self.zdok_n, vi = self.registers.analogue_gain_vi, vq = self.registers.analogue_gain_vq))
