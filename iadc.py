@@ -42,10 +42,18 @@ class IAdc:
         self.logger.info("iADC DCM reset for ZDOKL {n}".format(n = self.zdok_n))
 
     def write_all_registers(self):
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
-        self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
-
+        self.write_control_reg()
+        self.offset_set('I', self.registers.offset_vi)
+        self.offset_set('Q', self.registers.offset_vq)
+        self.analogue_gain_set('I', self.registers.analogue_gain_vi)
+        self.analogue_gain_set('Q', self.registers.analogue_gain_vq)
+        self.gain_compensation_set('I', self.registers.gain_compensation_vi)
+        self.gain_compensation_set('Q', self.registers.gain_compensation_vq)
+        self.drda_set('I', self.registers.drda_vi)
+        self.drda_set('Q', self.registers.drda_vq)
+        self.fisda_set(self.registers.fisda_q)
+        self.isa_set('I', self.registers.isa_i)
+        self.isa_set('Q', self.registers.isa_q)
 
     def set_cal_mode(self, mode):
         """
@@ -150,13 +158,43 @@ class IAdc:
             z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
 
     def analogue_gain_inc(self, channel):
-        pass
+        """
+        Increments analogue gain for channel by 0.011 dB
+        Returns True of gain can be adjusted or False if alreadt at maximum
+        """
+        assert(channel in ('I', 'Q'))
+        if channel == 'I':
+            return self.analogue_gain_set(channel, self.registers.analogue_gain_vi + 0.011)
+        elif channel == 'Q':
+            return self.analogue_gain_set(channel, self.registers.analogue_gain_vq + 0.011)
 
     def analogue_gain_dec(self, channel):
-        pass
+        """
+        Decreases analogue gain for channel by 0.011 dB.
+        Returns True if gain can by decreased or False if already at minimum
+        """
+        assert(channel in ('I', 'Q'))
+        if channel == 'I':
+            return self.analogue_gain_set(channel, self.registers.analogue_gain_vi - 0.011)
+        elif channel == 'Q':
+            return self.analogue_gain_set(channel, self.registers.analogue_gain_vq - 0.011)
 
     def analogue_gain_set(self, channel, value):
-        pass
+        """
+        Sets analogue gain for channel to specific value between -1.5 dB and 1.5 dB
+        Returns True if gain value valid or False if value already at maximum / minimum
+        """
+        assert(channel in ('I', 'Q'))
+        if( (value > 1.5) or (value < -1.5) ):  # check for out of bounds
+            return False
+        if channel == 'I':
+            self.registers.analogue_gain_vi = value
+        if channel == 'Q':
+            self.registers.analogue_gain_vi = value
+        corr.iadc.analogue_gain_adj(self.fpga, self.zdok_n, self.registers.analogue_gain_vi, self.registers.analogue_gain_vq) 
+        self.logger.info("For ADC {z}, analogue gain for I: {vi}, anaogue gain for Q: {vq}".format(
+            z = self.zdok_n, vi = self.registers.analogue_gain_vi, vq = self.registers.analogue_gain_vq))
+        return True
 
     def gain_compensation_inc(self, channel):
         pass
@@ -167,7 +205,52 @@ class IAdc:
     def gain_compensation_set(self, channel, value):
         pass
 
+    def fisda_set(self, value):
+        """
+        Defines a value for the Fine Sampling Delay Adjustment on channel Q
+        Value should be between -60 and 60 picoseconds. Steps of 4 ps.
+        Returns True if value can be set of False if it is too large / small
+        """
+        if( (value > 60) or (value < -60) ):
+            self.logger.warn("FiSDA value of {v} outside of [-60; 60] bounds".format(v = value))
+            return False
+        self.registers.fisda_q = value
+        corr.iadc.fisda_Q_adj(self.fpga, self.zdok_n, self.registers.fisda_q)
+        self.logger.info("For ADC {z}, FiSDA set to {v} ps".format(
+            z = self.zdok_n, v = self.registers.fisda_q))
 
+    def fisda_inc(self):
+        """
+        Increments the delay of the Q channel sampling by 4 ps
+        Return True if can be incremented or False if already at maximum
+        """
+        return self.fisda_set(self.registers.fisda_q + 4)
+
+    def fisda_dec(self):
+        """
+        Decrements the delay of the Q channel sampling by 4 ps
+        Returns True if it can be decremented or False if alreay at minimu
+        """
+        return self.fisda_set(self.registers.fisda_q - 4)
+
+    def drda_set(self, channel, value):
+        pass
+
+    def isa_set(self, channel, value):
+        """
+        Sets Internal Settling Adjustment for channel.
+        Value should be between -200 and 150 ps. Steps are 50 ps
+        """
+        assert(channel in ('I', 'Q'))
+        assert( (value > -200) and (value < 150) )
+        if channel == 'I':
+            self.registers.isa_i = value
+        if channel == 'Q':
+            self.registers.isa_q = value
+        corr.iadc.isa_adj(self.fpga, self.zdok_n, self.registers.isa_i, self.registers.isa_q)
+        self.logger.info("For ADC {z}, ISA_I: {i}, ISA_Q: {q}".format(
+            z = self.zdok_n, i = self.registers.isa_i, q = self.registers.isa_q))
+        
 # Note, the ADC must be set to No calibation beofre ghain and offsdrt adjustment can be made
 
 # I don't see the point of these functions.... 

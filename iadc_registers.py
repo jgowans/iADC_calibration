@@ -17,7 +17,12 @@ class IAdcRegisters(object):
         self.analogue_gain_vq = 0
         self.gain_compensation_vi = 0
         self.gain_compensation_vq = 0
-        self._frozen = True
+        self.drda_vi = 0
+        self.drda_vq = 0
+        self.fisda_q = 0
+        self.isa_i = -50  # for AT84AD001B this is recommended. It's different for AT84AD001C
+        self.isa_q = -50
+        self._frozen = True  # prevents accidentally adding new attributes.
 
     def __setattr__(self, name, value):
         """
