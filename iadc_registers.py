@@ -11,7 +11,7 @@ class IAdcRegisters(object):
         Initialises the defined registers to 0
         """
         object.__setattr__(self, '_frozen', False)  # this is to define #__setattr__
-        self.control = iadc_registers_control.IAdcRegistersControl()
+        self.control = iadc_registers_control.IAdcRegistersControl('indep', 'in', 'no_cal')
         self.offset_vi = 0
         self.offset_vq = 0
         self.analogue_gain_vi = 0

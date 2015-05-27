@@ -6,8 +6,11 @@ Contains some methods for modifying the parameters of this register
 """
 
 class IAdcRegistersControl:
-    def __init__(self, clk_speed=800):
+    def __init__(self, analogue_selection, clock_selection, cal_mode, clk_speed=800):
         """
+        analogue_selection -- 'indep', 'inter_I' or 'inter_Q'. See #set_analogue_selection.
+        clock_selection -- 'in', 'quad' or 'neg'. See #set_clock_selection
+        cal_mode -- 'no_cal', 'new_cal', or 'keep_last_cal'.
         clk_speed -- clock speed in MHz
         """
         self.value = 0
@@ -16,6 +19,9 @@ class IAdcRegistersControl:
         clk_bits = 0b00 if (clk_speed<125) else 0b01 if (clk_speed<250) else 0b10 if (clk_speed<500) else 0b11
         self.value |= (clk_bits << 12)  # control wait bit calibration value is dependent on clk speed
         self.value |= (1 << 14)  # set FDataReady to Fs/2. I don't know what this means
+        self.set_analogue_selection(analogue_selection)
+        self.set_clock_selection(clock_selection)
+        self.set_cal_mode(cal_mode)
 
     def set_analogue_selection(self, mode):
         """

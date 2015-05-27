@@ -7,25 +7,30 @@ import logging
 import time
 
 class Calibrator:
-    def __init__(self, iadc, snapshot_I, snapshot_Q, logger=logging.getLogger()):
+    def __init__(self, iadc, snapshot, interleaved=True, logger=logging.getLogger()):
         """ Calibrator is contains logic for calibration routines
         
-        snapshot_X -- instance of Snapshot which is used for getting data
-            from ADC channel X
         iadc -- instance of IAdc which is used for modifying parameters
+        snapshot -- instance of Snapshot which has been initialised to the
+            same ADC ZDOK as iad has.
+        interleaved -- if True, read data interleaved from RF input I.
+            If False, read I and Q seperately.
         """
         logging.basicConfig()
         self.logger = logger
-        self.snapshot_I = snapshot_I
-        self.snapshot_Q = snapshot_Q
         self.iadc = iadc
+        self.snapshot = snapshot
+        self.interleaved = interleaved
 
     def run_offset_cal(self):
         """ Performs offset calibration
         """
+        if self.interleaved == True:
+            self.snapshot.set_mode('inter')
         for channel in ('I', 'Q'):
-            snap = getattr(self, "snapshot_{x}".format(x = channel))
-            new_mean = snap.get_mean() # should have a magnitute somewhere between 0 and 4
+            if self.interleaved == False:
+                self.snapshot.set_mode(channel)  # only bother reading out the core we're keen on if not interleaving
+            new_mean = snap.get_means()[channel] # should have a magnitute somewhere between 0 and 4
             self.logger.info("Before clibration, offset = {o} for channel {c}".format(c = channel, o = new_mean))
             if(new_mean > 0):  # we want to decrease the offset
                 while(new_mean > 0):
@@ -49,9 +54,8 @@ class Calibrator:
             new_mean = snap.get_mean()
             self.logger.info("After clibration, offset = {o} for channel {c}".format(c = channel, o = new_mean))
 
-    def run_analogue_gain_cal(self):
+    def run_analogue_gain_cal(self, interleaved=True):
         """Attempts to get the sum of the squared output values to be equal for each channel.
-        The assumption is that exaclty equal signals are going in.
         """
         channel_I_sum = self.snapshot_I.get_sum_squared()
         channel_Q_sum = self.snapshot_Q.get_sum_squared()
