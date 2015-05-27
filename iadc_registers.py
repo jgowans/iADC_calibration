@@ -3,6 +3,7 @@
 import json
 import logging
 import iadc_registers_control
+import os
 
 class IAdcRegisters(object):
     def __init__(self):
@@ -43,16 +44,17 @@ class IAdcRegisters(object):
         Reads a JSON file which was written by #save_to_file
         and sets the registers to those values
         """
-        with open(filename) as f:
-            registers = json.loads(f.read())
-            
-        self.control = registers['control_reg']
-        self.offset_vi = registers['offset_vi']
-        self.offset_vq = registers['offset_vq']
-        self.analogue_gain_vi = registers['analogue_gain_vi']
-        self.analogue_gain_vq = registers['analogue_gain_vq']
-        self.gain_compensation_vi = registers['gain_compensation_vi']
-        self.gain_compensation_vq = registers['gain_compensation_vq']
+        if os.path.isfile(filename) == True:
+            with open(filename) as f:
+                registers = json.loads(f.read())
+                
+            self.control.value = registers.get('control', iadc_registers_control.IAdcRegistersControl().value)
+            self.offset_vi = registers.get('offset_vi', 0)
+            self.offset_vq = registers.get('offset_vq', 0)
+            self.analogue_gain_vi = registers.get('analogue_gain_vi', 0)
+            self.analogue_gain_vq = registers.get('analogue_gain_vq', 0)
+            self.gain_compensation_vi = registers.get('gain_compensation_vi', 0)
+            self.gain_compensation_vq = registers.get('gain_compensation_vq', 0)
 
     def save_to_file(self, filename):
         """
@@ -60,7 +62,7 @@ class IAdcRegisters(object):
         the JSON file format
         """
         json_string = json.dumps({
-            "control_reg": self.control_reg,
+            "control": self.control.value,
             "offset_vi": self.offset_vi,
             "offset_vq": self.offset_vq,
             "analogue_gain_vi": self.analogue_gain_vi,
