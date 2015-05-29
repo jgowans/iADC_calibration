@@ -7,7 +7,7 @@
 import corr
 import logging
 import json
-import iadc_registers
+from iadc_registers import IADcRegisters
 
 class IAdc:
     def __init__(self, fpga, zdok_n, mode='indep', logger=logging.getLogger()):
@@ -23,7 +23,7 @@ class IAdc:
         self.zdok_n = zdok_n
         self.fpga = fpga
         corr.iadc.set_mode(self.fpga, mode='SPI')  # enable software control
-        self.registers = iadc_registers.IAdcRegisters()
+        self.registers = IAdcRegisters()
         self.write_control_reg()
         self.logger.debug("Initialised iADC for software control")
 
@@ -34,8 +34,8 @@ class IAdc:
         return self.fpga.read('iadc_controller', 128)
 
     def write_control_reg(self):
-        corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.registers.control.value)
-        logging.debug("Control register set to: {cr:#06x}".format(cr = self.registers.control.value))
+        corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.registers['control'].value)
+        logging.debug("Control register set to: {cr:#06x}".format(cr = self.registers['control'].value))
 
     def reset_dcm(self):
         corr.iadc.rst(self.fpga, self.zdok_n)
@@ -43,17 +43,17 @@ class IAdc:
 
     def write_all_registers(self):
         self.write_control_reg()
-        self.offset_set('I', self.registers.offset_vi)
-        self.offset_set('Q', self.registers.offset_vq)
-        self.analogue_gain_set('I', self.registers.analogue_gain_vi)
-        self.analogue_gain_set('Q', self.registers.analogue_gain_vq)
-        self.gain_compensation_set('I', self.registers.gain_compensation_vi)
-        self.gain_compensation_set('Q', self.registers.gain_compensation_vq)
-        self.drda_set('I', self.registers.drda_vi)
-        self.drda_set('Q', self.registers.drda_vq)
-        self.fisda_set(self.registers.fisda_q)
-        self.isa_set('I', self.registers.isa_i)
-        self.isa_set('Q', self.registers.isa_q)
+        self.offset_set('I', self.registers['offset_vi'])
+        self.offset_set('Q', self.registers['offset_vq'])
+        self.analogue_gain_set('I', self.registers['analogue_gain_vi'])
+        self.analogue_gain_set('Q', self.registers['analogue_gain_vq'])
+        self.gain_compensation_set('I', self.registers['gain_compensation_vi'])
+        self.gain_compensation_set('Q', self.registers['gain_compensation_vq'])
+        self.drda_set('I', self.registers['drda_vi'])
+        self.drda_set('Q', self.registers['drda_vq'])
+        self.fisda_set(self.registers['fisda_q'])
+        self.isa_set('I', self.registers['isa_i'])
+        self.isa_set('Q', self.registers['isa_q'])
 
     def set_cal_mode(self, mode):
         """
@@ -65,7 +65,7 @@ class IAdc:
             no_cal: removes cal values and allows register modifications
         """
         # just pass it on. Validation is done there.
-        self.registers.control.set_cal_mode(mode)
+        self.registers['control'].set_cal_mode(mode)
         self.write_control_reg()
         self.logger.info("For ADC {z}, calibration set to: '{c}'".format(z = self.zdok_n, c = mode))
 
@@ -79,7 +79,7 @@ class IAdc:
             inter_I:    InI -> ADCI ; InI -> ADCQ
             inter_Q:    InQ -> ADCI ; InQ -> ADCQ
         """
-        self.registers.control.set_analogue_selection(mode)
+        self.registers['control'].set_analogue_selection(mode)
         self.write_control_reg()
         self.logger.info("On ADC: {z}, set analogue mode to: {m}".format(z = self.zdok_n, m = mode))
 
@@ -92,7 +92,7 @@ class IAdc:
             quad:   quadtrature
             neg:    180 degree phase shift (negative)
         """
-        self.registers.control.set_clock_selection(mode)
+        self.registers['control'].set_clock_selection(mode)
         self.write_control_reg()
         self.logger.info("On ADC: {z} set clock selection to: {m}".format(z = self.zdok_n, m = mode))
 
@@ -104,18 +104,18 @@ class IAdc:
         Returns True if offset could be increased or False it it's already at maximum
         """
         assert(channel in ('I', 'Q'))
-        if ( (channel == 'I' and self.registers.offset_vi >= 31.75) or 
-                (channel == 'Q' and self.registers.offset_vq >= 31.75) ):
+        if ( (channel == 'I' and self.registers['offset_vi'] >= 31.75) or 
+                (channel == 'Q' and self.registers['offset_vq'] >= 31.75) ):
             self.logger.warn("Offset for channel {c} already at maximum.".format(c = channel))
             return False
         if channel == 'I':
-            self.registers.offset_vi += 0.25
+            self.registers['offset_vi'] += 0.25
         elif channel == 'Q':
-            self.registers.offset_vq += 0.25
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
+            self.registers['offset_vq'] += 0.25
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers['offset_vi'], self.registers['offset_vq'])
         # this reall should be moved into the corr.iadc file...
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
+            z = self.zdok_n, vi = self.registers['offset_vi'], vq = self.registers['offset_vq']))
         return True
 
     def offset_dec(self, channel):
@@ -126,17 +126,17 @@ class IAdc:
         Returns True if offset could be decreased of False if it's already at minimum.
         """
         assert(channel in ('I', 'Q'))
-        if ( (channel == 'I' and self.registers.offset_vi <= -31.75) or
-                (channel == 'Q' and self.registers.offset_vq <= -31.75) ):
+        if ( (channel == 'I' and self.registers['offset_vi'] <= -31.75) or
+                (channel == 'Q' and self.registers['offset_vq'] <= -31.75) ):
             self.logger.warn("Offset for channel {c} already at minimum".format(c = channel))
             return False
         if channel == 'I':
-            self.registers.offset_vi -= 0.25
+            self.registers['offset_vi'] -= 0.25
         elif channel == 'Q':
-            self.registers.offset_vq -= 0.25
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
+            self.registers['offset_vq'] -= 0.25
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers['offset_vi'], self.registers['offset_vq'])
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
+            z = self.zdok_n, vi = self.registers['offset_vi'], vq = self.registers['offset_vq']))
         return True
 
     def offset_set(self, channel, value):
@@ -150,12 +150,12 @@ class IAdc:
         assert(channel in ('I', 'Q'))
         assert( (value <= 31.75) and (value >= -31.75) )
         if channel == 'I':
-            self.registers.offset_vi = value
+            self.registers['offset_vi'] = value
         if channel == 'Q':
-            self.registers.offset_vq = value
-        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers.offset_vi, self.registers.offset_vq)
+            self.registers['offset_vq'] = value
+        corr.iadc.offset_adj(self.fpga, self.zdok_n, self.registers['offset_vi'], self.registers['offset_vq'])
         self.logger.info("For ADC {z}, offset for I: {vi}, offset for Q: {vq}".format(
-            z = self.zdok_n, vi = self.registers.offset_vi, vq = self.registers.offset_vq))
+            z = self.zdok_n, vi = self.registers['offset_vi'], vq = self.registers['offset_vq']))
 
     def analogue_gain_inc(self, channel):
         """
@@ -164,9 +164,9 @@ class IAdc:
         """
         assert(channel in ('I', 'Q'))
         if channel == 'I':
-            return self.analogue_gain_set(channel, self.registers.analogue_gain_vi + 0.011)
+            return self.analogue_gain_set(channel, self.registers['analogue_gain_vi'] + 0.011)
         elif channel == 'Q':
-            return self.analogue_gain_set(channel, self.registers.analogue_gain_vq + 0.011)
+            return self.analogue_gain_set(channel, self.registers['analogue_gain_vq'] + 0.011)
 
     def analogue_gain_dec(self, channel):
         """
@@ -175,9 +175,9 @@ class IAdc:
         """
         assert(channel in ('I', 'Q'))
         if channel == 'I':
-            return self.analogue_gain_set(channel, self.registers.analogue_gain_vi - 0.011)
+            return self.analogue_gain_set(channel, self.registers['analogue_gain_vi'] - 0.011)
         elif channel == 'Q':
-            return self.analogue_gain_set(channel, self.registers.analogue_gain_vq - 0.011)
+            return self.analogue_gain_set(channel, self.registers['analogue_gain_vq'] - 0.011)
 
     def analogue_gain_set(self, channel, value):
         """
@@ -188,12 +188,13 @@ class IAdc:
         if( (value > 1.5) or (value < -1.5) ):  # check for out of bounds
             return False
         if channel == 'I':
-            self.registers.analogue_gain_vi = value
+            self.registers['analogue_gain_vi'] = value
         if channel == 'Q':
-            self.registers.analogue_gain_vq = value
-        corr.iadc.analogue_gain_adj(self.fpga, self.zdok_n, self.registers.analogue_gain_vi, self.registers.analogue_gain_vq) 
+            self.registers['analogue_gain_vq'] = value
+        corr.iadc.analogue_gain_adj(
+            self.fpga, self.zdok_n, self.registers['analogue_gain_vi'], self.registers['analogue_gain_vq']) 
         self.logger.info("For ADC {z}, analogue gain for I: {vi}, anaogue gain for Q: {vq}".format(
-            z = self.zdok_n, vi = self.registers.analogue_gain_vi, vq = self.registers.analogue_gain_vq))
+            z = self.zdok_n, vi = self.registers['analogue_gain_vi'], vq = self.registers['analogue_gain_vq']))
         return True
 
     def gain_compensation_inc(self, channel):
@@ -214,24 +215,24 @@ class IAdc:
         if( (value > 60) or (value < -60) ):
             self.logger.warn("FiSDA value of {v} outside of [-60; 60] bounds".format(v = value))
             return False
-        self.registers.fisda_q = value
-        corr.iadc.fisda_Q_adj(self.fpga, self.zdok_n, self.registers.fisda_q)
+        self.registers['fisda_q'] = value
+        corr.iadc.fisda_Q_adj(self.fpga, self.zdok_n, self.registers['fisda_q'])
         self.logger.info("For ADC {z}, FiSDA set to {v} ps".format(
-            z = self.zdok_n, v = self.registers.fisda_q))
+            z = self.zdok_n, v = self.registers['fisda_q']))
 
     def fisda_inc(self):
         """
         Increments the delay of the Q channel sampling by 4 ps
         Return True if can be incremented or False if already at maximum
         """
-        return self.fisda_set(self.registers.fisda_q + 4)
+        return self.fisda_set(self.registers['fisda_q'] + 4)
 
     def fisda_dec(self):
         """
         Decrements the delay of the Q channel sampling by 4 ps
         Returns True if it can be decremented or False if alreay at minimu
         """
-        return self.fisda_set(self.registers.fisda_q - 4)
+        return self.fisda_set(self.registers['fisda_q'] - 4)
 
     def drda_set(self, channel, value):
         pass
@@ -244,12 +245,12 @@ class IAdc:
         assert(channel in ('I', 'Q'))
         assert( (value > -200) and (value < 150) )
         if channel == 'I':
-            self.registers.isa_i = value
+            self.registers['isa_i'] = value
         if channel == 'Q':
-            self.registers.isa_q = value
-        corr.iadc.isa_adj(self.fpga, self.zdok_n, self.registers.isa_i, self.registers.isa_q)
+            self.registers['isa_q'] = value
+        corr.iadc.isa_adj(self.fpga, self.zdok_n, self.registers['isa_i'], self.registers['isa_q'])
         self.logger.info("For ADC {z}, ISA_I: {i}, ISA_Q: {q}".format(
-            z = self.zdok_n, i = self.registers.isa_i, q = self.registers.isa_q))
+            z = self.zdok_n, i = self.registers['isa_i'], q = self.registers['isa_q']))
         
 # Note, the ADC must be set to No calibation beofre ghain and offsdrt adjustment can be made
 

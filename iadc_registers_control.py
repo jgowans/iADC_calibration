@@ -6,7 +6,7 @@ Contains some methods for modifying the parameters of this register
 """
 
 class IAdcRegistersControl:
-    def __init__(self, analogue_selection, clock_selection, cal_mode, clk_speed=800):
+    def __init__(self, analogue_selection='indep', clock_selection='in', cal_mode='no_cal', clk_speed=800):
         """
         analogue_selection -- 'indep', 'inter_I' or 'inter_Q'. See #set_analogue_selection.
         clock_selection -- 'in', 'quad' or 'neg'. See #set_clock_selection
