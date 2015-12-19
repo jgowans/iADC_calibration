@@ -34,7 +34,7 @@ class IAdc:
 
     def write_control_reg(self):
         corr.iadc.spi_write_register(self.fpga, self.zdok_n, 0x00, self.registers['control'].value)
-        logging.debug("Control register set to: {cr:#06x}".format(cr = self.registers['control'].value))
+        self.logger.debug("Control register set to: {cr:#06x}".format(cr = self.registers['control'].value))
 
     def reset_dcm(self):
         corr.iadc.rst(self.fpga, self.zdok_n)

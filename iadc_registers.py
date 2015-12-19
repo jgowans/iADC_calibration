@@ -52,10 +52,10 @@ class IAdcRegisters(object):
         """
         with open(filename) as f:
             registers = json.loads(f.read())
-        for name, value in registers:
+        for name, value in registers.items():
             self._registers[name] = value
         # special case: the control register should be an instance of IadcRegistersControl
-        control_reg = iadc_registers_control.IAdcRegistersControl()
+        control_reg = IAdcRegistersControl()
         control_reg.value = self._registers['control']
         self._registers['control'] = control_reg
 
