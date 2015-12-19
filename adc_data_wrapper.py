@@ -6,11 +6,10 @@ functions on the data received
 import numpy as np
 import logging
 
-class Snapshot:
-    def __init__(self, fpga, zdok_n, mode, logger=logging.getLogger(__name__)):
+class AdcDataWrapper:
+    def __init__(self, correlator, fs = 800e6, logger=logging.getLogger(__name__)):
         """
-        fpga -- instance of corr.katcp_wrapper.FpgaClient
-        zdok_num -- which ADC to snap from. 0 or 1
+        correlator -- instance of directionFinder_backend.correlator.Correlator
         mode -- 'I', 'Q', or 'inter'.
             I: only get the snap from I channel
             Q: only get the snap from Q channel
@@ -18,9 +17,45 @@ class Snapshot:
             inter: get an interleaved channel
         """
         self.logger = logger
-        self.fpga = fpga
-        self.zdok_n = zdok_n
-        self.set_mode(mode)
+        self.correlator = correlator
+        self.fs = float(fs)
+
+    def resample(self):
+        """ Updates the samples from the ADC
+        """
+        self.correlator.fetch_time_domain_snapshot(force=True)
+
+    def get_offset(self, channel):
+        """ Returns the DC offset of a channel.
+        Channel is ('0I, 0Q, 1I, 1Q')
+        """
+        chan_idx = ['0I', '0Q', '1I', '1Q'].index(channel)
+        return np.mean(self.correlator.time_domain_signals[chan_idx])
+
+    def get_phase_difference(self, channel_a, channel_b):
+        """ Retuns phase difference between strongest signal
+        in channel a vs the same tone in channel b"
+        """
+        chan_a_idx = ['0I', '0Q', '1I', '1Q'].index(channel_a)
+        chan_b_idx = ['0I', '0Q', '1I', '1Q'].index(channel_b)
+        chan_a_sub_arrays = np.split(
+            self.correlator.time_domain_signals[chan_a_idx], 
+            len(self.correlator.time_domain_signals[chan_a_idx])/2**11)
+        chan_b_sub_arrays = np.split(
+            self.correlator.time_domain_signals[chan_b_idx],
+            len(self.correlator.time_domain_signals[chan_b_idx])/2**11)
+        cross_acc = np.ndarray((2**11/2) + 1, dtype=np.complex128)
+        for sub_idx in range(len(chan_a_sub_arrays)):
+            fft_a = np.fft.rfft(chan_a_sub_arrays[sub_idx])
+            fft_b = np.fft.rfft(chan_b_sub_arrays[sub_idx])
+            cross = fft_a * np.conj(fft_b)
+            cross_acc += cross
+        max_idx = np.argmax(np.abs(cross_acc))
+        max_freq = self.fs/2 * (max_idx / float(len(cross_acc)))
+        max_phase = np.angle(cross_acc[max_idx])
+        self.logger.info("Between {a} and {b}, max freq: {f} with phase difference: {ph}".format(
+            a = channel_a, b = channel_b,
+            f = max_freq/1e6, ph = max_phase))
 
     def set_mode(self, mode):
         assert(mode in ('I', 'Q', 'IQ', 'inter'))

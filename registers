@@ -1,0 +1,14 @@
+{
+    "analogue_gain_vi": 0.0, 
+    "analogue_gain_vq": 0.0, 
+    "control": 28860, 
+    "drda_vi": 0, 
+    "drda_vq": 0, 
+    "fisda_q": 0, 
+    "gain_compensation_vi": 0, 
+    "gain_compensation_vq": 0, 
+    "isa_i": -50, 
+    "isa_q": -50, 
+    "offset_vi": 0.75, 
+    "offset_vq": 5.0
+}
