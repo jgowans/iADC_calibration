@@ -7,10 +7,10 @@
 import corr
 import logging
 import json
-from iadc_registers import IADcRegisters
+from iadc_registers import IAdcRegisters
 
 class IAdc:
-    def __init__(self, fpga, zdok_n, mode='indep', logger=logging.getLogger()):
+    def __init__(self, fpga, zdok_n, mode='indep', logger=logging.getLogger(__name__)):
         """
         fpga -- corr.katcp_wrapper.FpgaClient instance used to talk to ROACH
         zdok_n -- either 0 or 1. Specifies which ADC card to control
@@ -18,7 +18,6 @@ class IAdc:
             either: 'indep', 'inter_Q' or'inter_I'. Default: 'indep'
         logger -- instance of a Logger. Default: root logger.
         """
-        logging.basicConfig()
         self.logger = logger
         self.zdok_n = zdok_n
         self.fpga = fpga

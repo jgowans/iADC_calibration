@@ -7,7 +7,9 @@ Contains some methods for modifying the parameters of this register
 
 class IAdcRegistersControl:
     def __init__(self, analogue_selection='indep', clock_selection='in', cal_mode='no_cal', clk_speed=800):
-        """
+        """ The control register created by default is designed to sample the I Q channels
+        independantly (ie: each get RF input gets sampled by its core) and in phase.
+
         analogue_selection -- 'indep', 'inter_I' or 'inter_Q'. See #set_analogue_selection.
         clock_selection -- 'in', 'quad' or 'neg'. See #set_clock_selection
         cal_mode -- 'no_cal', 'new_cal', or 'keep_last_cal'.
