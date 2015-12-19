@@ -218,6 +218,7 @@ class IAdc:
         corr.iadc.fisda_Q_adj(self.fpga, self.zdok_n, self.registers['fisda_q'])
         self.logger.info("For ADC {z}, FiSDA set to {v} ps".format(
             z = self.zdok_n, v = self.registers['fisda_q']))
+        return True
 
     def fisda_inc(self):
         """

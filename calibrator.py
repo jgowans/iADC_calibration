@@ -70,9 +70,42 @@ class Calibrator:
         new_mean = self.adw.get_offset(channel)
         self.logger.info("After clibration, offset = {o} for channel {c}".format(c = channel, o = new_mean))
 
+    def run_phase_difference_cal(self, interleaved=False):
+        """ Attempts to get the phase difference between the channels
+        down to 0
+        """
+        self.adw.resample()
+        new_phase = self.adw.get_phase_difference()
+        self.logger.info("Before clibration phase difference = {p}".format(p = new_phase))
+        if(new_phase > 0):  # I ahead of Q. 
+            while(new_phase > 0):
+                assert(self.iadc.fisda_inc() == True) # decrease the Q delay (advance Q)
+                last_phase = new_phase
+                time.sleep(0.1)  # some time for the change to 'apply'
+                self.adw.resample()
+                new_phase = self.adw.get_phase_difference()
+                assert(new_phase < last_phase)
+            # fix if we have gone too far
+            if(abs(new_phase) > abs(last_phase)):
+               self.iadc.fisda_dec()  # advanced Q too much. Inc the Q delay.
+        elif(new_phase < 0):  # we want to increase the offset
+            while(new_phase < 0):
+                assert(self.iadc.fisda_dec() == True)  # delay Q. 
+                last_phase = new_phase
+                time.sleep(0.1)
+                self.adw.resample()
+                new_phase = self.adw.get_phase_difference()
+            if(abs(new_phase) > abs(last_phase)):
+               self.iadc.fisda_inc()
+        time.sleep(0.1)
+        self.adw.resample()
+        new_phase = self.adw.get_phase_difference()
+        self.logger.info("After calibration phase difference: {ph}".format(ph = new_phase))
+
     def run_analogue_gain_cal(self, interleaved=False):
         """Attempts to get the sum of the squared output values to be equal for each channel.
         """
+        raise Exception("Not really implemented properly yet...")
         self.snapshot.set_mode('IQ')
         sums_squared = self.snapshot.get_sum_squared()
         channel_I_sum = sums_squared['I']

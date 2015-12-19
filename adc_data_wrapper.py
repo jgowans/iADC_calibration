@@ -43,14 +43,14 @@ class AdcDataWrapper:
         self.logger.debug("Power for channel {c}: {v}".format(c = channel, v = power))
         return power
 
-    def get_phase_difference(self, channel_a, channel_b):
+    def get_phase_difference(self):
         """ Retuns phase difference between strongest signal
-        in channel a vs the same tone in channel b.
-        If the phase is positive, it means A comes before B
-        If the phase is negative, it means B comes before A
+        Does phase(I) - phase(Q)
+        If the phase is positive, it means that I comes before Q. I leads. 
+        If the phase is negative, it means Q comes before I. 
         """
-        chan_a_idx = ['I', 'Q'].index(channel_a) + (2 * self.zdok_n)
-        chan_b_idx = ['I', 'Q'].index(channel_b) + (2 * self.zdok_n)
+        chan_a_idx = 0 + (2 * self.zdok_n)  
+        chan_b_idx = 1 + (2 * self.zdok_n)
         chan_a_sub_arrays = np.split(
             self.correlator.time_domain_signals[chan_a_idx], 
             len(self.correlator.time_domain_signals[chan_a_idx])/2**11)
@@ -66,7 +66,6 @@ class AdcDataWrapper:
         max_idx = np.argmax(np.abs(cross_acc))
         max_freq = self.fs/2 * (max_idx / float(len(cross_acc)))
         max_phase = np.angle(cross_acc[max_idx])
-        self.logger.debug("Between {a} and {b}, max freq: {f} with phase difference: {ph}".format(
-            a = channel_a, b = channel_b,
+        self.logger.debug("Between I and Q, max freq: {f} with phase difference: {ph}".format(
             f = max_freq/1e6, ph = max_phase))
-
+        return max_phase
