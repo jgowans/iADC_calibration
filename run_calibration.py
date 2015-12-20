@@ -13,7 +13,7 @@ ZDOK_N = 1
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger('maiin')
+    logger = logging.getLogger('main')
     handler = logging.StreamHandler()
     colored_formatter = ColoredFormatter("%(log_color)s%(asctime)s%(levelname)s:%(name)s:%(message)s")
     handler.setFormatter(colored_formatter)
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     iadc.set_cal_mode('no_cal')
     time.sleep(0.5)
     cal = calibrator.Calibrator(iadc, adr, interleaved=False, logger=logger.getChild('calibrator'))
-    #cal.run_offset_cal()
-    cal.run_phase_difference_cal()
+    cal.run_offset_cal()
+    #cal.run_phase_difference_cal()
     #cal.run_analogue_gain_cal()
     iadc.registers.save_to_file('registers_{zdok_n}.json'.format(zdok_n = ZDOK_N))

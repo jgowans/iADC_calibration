@@ -9,6 +9,6 @@
     "gain_compensation_vq": 0, 
     "isa_i": -50, 
     "isa_q": -50, 
-    "offset_vi": 8.75, 
-    "offset_vq": 14.0
+    "offset_vi": 8.5, 
+    "offset_vq": 13.75
 }
